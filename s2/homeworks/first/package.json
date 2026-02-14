@@ -1,0 +1,12 @@
+{
+  "name": "music-seed",
+  "version": "1.0.0",
+  "description": "Seed script for music DB (~1M rows)",
+  "main": "seed.js",
+  "scripts": {
+    "seed": "node seed.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.0"
+  }
+}
