@@ -1,6 +1,6 @@
 services:
   pg:
-    image: postgres:latest
+    image: postgres:17
     environment:
       POSTGRES_DB: music
       POSTGRES_USER: user
