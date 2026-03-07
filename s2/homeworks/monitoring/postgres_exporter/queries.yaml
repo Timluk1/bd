@@ -1,0 +1,24 @@
+pg_stat_statements_by_verb:
+  query: |
+    SELECT
+      CASE
+        WHEN LTRIM(query) ILIKE 'select%' THEN 'SELECT'
+        WHEN LTRIM(query) ILIKE 'insert%' THEN 'INSERT'
+        WHEN LTRIM(query) ILIKE 'delete%' THEN 'DELETE'
+        WHEN LTRIM(query) ILIKE 'update%' THEN 'UPDATE'
+      END AS verb,
+      SUM(calls)::float AS calls,
+      SUM(rows)::float AS rows_total
+    FROM pg_stat_statements
+    WHERE LTRIM(query) ILIKE ANY(ARRAY['select%','insert%','delete%','update%'])
+    GROUP BY verb
+  metrics:
+    - verb:
+        usage: "LABEL"
+        description: "SQL verb (SELECT, INSERT, DELETE, UPDATE)"
+    - calls:
+        usage: "COUNTER"
+        description: "Total number of calls"
+    - rows_total:
+        usage: "COUNTER"
+        description: "Total number of rows affected"

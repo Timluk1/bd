@@ -1,0 +1,85 @@
+networks:
+  monitoring:
+    name: monitoring
+
+services:
+  pg:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: music
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init/init-extensions.sql:/docker-entrypoint-initdb.d/init-extensions.sql:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    networks:
+      - monitoring
+
+  flyway:
+    image: flyway/flyway:latest
+    depends_on:
+      pg:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/flyway/sql
+    command: -url=jdbc:postgresql://pg:5432/music -user=user -password=password migrate
+    networks:
+      - monitoring
+
+  postgres_exporter:
+    image: prometheuscommunity/postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://user:password@pg:5432/music?sslmode=disable"
+    volumes:
+      - ./monitoring/postgres_exporter/queries.yaml:/queries.yaml:ro
+    command:
+      - "--extend.query-path=/queries.yaml"
+    ports:
+      - "9187:9187"
+    depends_on:
+      pg:
+        condition: service_healthy
+    networks:
+      - monitoring
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - postgres_exporter
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring
+
+
+volumes:
+  pgdata:
+  prometheus_data:
+  grafana_data:

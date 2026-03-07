@@ -1,8 +1,8 @@
 # ДЗ 3 — Индексы (B-tree, Hash)
 
-## Подготовка: удаление существующих индексов
+## Подготовка
 
-В миграции `V3__indexes.sql` были созданы следующие индексы:
+В миграции `V3__indexes.sql` уже были созданы индексы, поэтому перед проверкой я их удалил:
 
 | Индекс | Таблица | Тип | Столбец |
 |--------|---------|-----|---------|
@@ -17,8 +17,6 @@
 | `idx_listening_location` | listening_history | GiST | location |
 | `idx_user_sub_period` | "user" | GiST | subscription_period |
 | `idx_listening_duration` | listening_history | GiST | listen_duration |
-
-Удаляем их перед тестированием, чтобы они не влияли на планировщик:
 
 ```sql
 DROP INDEX IF EXISTS idx_track_search;
@@ -57,7 +55,7 @@ Planning Time: 0.159 ms
 Execution Time: 52.886 ms
 ```
 
-> **Seq Scan**, 6028 буферов (3913 + 2115), **52.9 ms**. Все 250 000 строк проверяются последовательно.
+Без индекса PostgreSQL делает `Seq Scan`, то есть проходит по всей таблице. Время выполнения получилось `52.9 ms`.
 
 ### С B-tree индексом
 
@@ -78,7 +76,7 @@ Planning Time: 0.318 ms
 Execution Time: 41.255 ms
 ```
 
-> **Bitmap Index Scan** по B-tree. Индекс читает **55 буферов**, остальное — heap. Индекс используется, но из-за низкой селективности значительного прироста нет
+С `B-tree` индексом уже используется `Bitmap Index Scan`. Улучшение есть, но оно небольшое, потому что по условию находится много строк.
 
 ### С Hash индексом
 
@@ -100,7 +98,7 @@ Planning Time: 0.121 ms
 Execution Time: 19.886 ms
 ```
 
-> **Bitmap Index Scan** по Hash. **19.9 ms** — быстрее B-tree. Hash оптимален для `=`.
+С `Hash` индексом запрос выполнился быстрее, чем с `B-tree`: `19.9 ms` против `41.3 ms`. Для точного сравнения по `=` он подходит лучше.
 
 ```sql
 DROP INDEX idx_user_country_hash;
@@ -129,7 +127,7 @@ Planning Time: 0.084 ms
 Execution Time: 576.791 ms
 ```
 
-> **Seq Scan**, 21 475 буферов, **576.8 ms**. Все 250 000 строк сканируются.
+Без индекса снова получается полный проход по таблице. Здесь это уже заметно дольше: `576.8 ms`.
 
 ### С B-tree индексом
 
@@ -150,7 +148,7 @@ Planning Time: 0.129 ms
 Execution Time: 8.076 ms
 ```
 
-> **Bitmap Index Scan** по B-tree. **8.1 ms** vs 576.8 ms — ускорение в **71 раз**. B-tree отлично работает с `>`.
+С `B-tree` индексом запрос ускорился очень сильно: `8.1 ms` вместо `576.8 ms`. Для диапазонных условий такой индекс хорошо подходит.
 
 ### С Hash индексом
 
@@ -169,7 +167,7 @@ Planning Time: 0.168 ms
 Execution Time: 95.399 ms
 ```
 
-> **Seq Scan** — Hash **не поддерживает** `>`. Индекс полностью игнорируется.
+`Hash` индекс здесь не используется, потому что он не поддерживает оператор `>`.
 
 ```sql
 DROP INDEX idx_track_playcount_hash;
@@ -198,7 +196,7 @@ Planning Time: 4.638 ms
 Execution Time: 124.874 ms
 ```
 
-> **Seq Scan**, 21 475 буферов, **124.9 ms**.
+Без индекса выполняется полный проход по таблице, время `124.9 ms`.
 
 ### С B-tree индексом
 
@@ -219,7 +217,7 @@ Planning Time: 0.152 ms
 Execution Time: 68.707 ms
 ```
 
-> **Bitmap Index Scan** по B-tree. **68.7 ms** vs 124.9 ms — ускорение в **~1.8 раз**. Индекс читает 35 буферов.
+`B-tree` снова используется, но выигрыш уже не такой большой: `68.7 ms` вместо `124.9 ms`.
 
 ### С Hash индексом
 
@@ -238,7 +236,7 @@ Planning Time: 0.169 ms
 Execution Time: 106.546 ms
 ```
 
-> **Seq Scan** — Hash **не поддерживает** `<`. Индекс игнорируется.
+С `Hash` индексом ситуация такая же: оператор `<` он не поддерживает.
 
 ```sql
 DROP INDEX idx_track_duration_hash;
@@ -246,7 +244,7 @@ DROP INDEX idx_track_duration_hash;
 
 ---
 
-## Запрос 4 — операторы `LIKE 'prefix%'` и `IN`
+## Запрос 4 — `LIKE 'prefix%'` и `IN`
 
 ```sql
 SELECT * FROM "user" WHERE username LIKE 'user\_1%' AND country IN ('US', 'UK', 'DE');
@@ -269,7 +267,7 @@ Planning Time: 0.109 ms
 Execution Time: 79.382 ms
 ```
 
-> **Parallel Seq Scan**, 6 028 буфера, **79 ms**.
+Без индексов PostgreSQL использует `Parallel Seq Scan`. Время выполнения около `79 ms`.
 
 ### С B-tree индексом
 
@@ -293,7 +291,7 @@ Planning Time: 7.228 ms
 Execution Time: 47.675 ms
 ```
 
-> **Bitmap Index Scan** по `idx_user_country_btree`. B-tree поддерживает `IN` — индекс по country считывает 114 буферов, затем heap фильтрует по LIKE.
+Здесь реально помог индекс по `country`. Условие `IN` отработало через `B-tree`, а `LIKE` применился уже после чтения строк.
 
 ### С Hash индексом
 
@@ -314,7 +312,7 @@ Planning Time: 0.142 ms
 Execution Time: 29.897 ms
 ```
 
-> **Seq Scan** — Hash **не поддерживает** ни `LIKE`, ни `IN`. Оба индекса игнорируются.
+`Hash` индексы тут пользы не дали. Для `LIKE` они не подходят, и в этом плане PostgreSQL их не использовал.
 
 ```sql
 DROP INDEX idx_user_username_hash;
@@ -323,7 +321,7 @@ DROP INDEX idx_user_country_hash;
 
 ---
 
-## Запрос 5 — оператор `%LIKE` (LIKE '%suffix')
+## Запрос 5 — `LIKE '%suffix'`
 
 ```sql
 SELECT * FROM track WHERE title LIKE '%60';
@@ -348,7 +346,7 @@ Planning Time: 0.094 ms
 Execution Time: 27.961 ms
 ```
 
-> **Parallel Seq Scan**, 21 475 буферов, **27.961 ms**.
+Без индекса получаем `Parallel Seq Scan`, время `27.961 ms`.
 
 ### С B-tree индексом
 
@@ -370,7 +368,7 @@ Planning Time: 0.373 ms
 Execution Time: 26.843 ms
 ```
 
-> **Parallel Seq Scan** — B-tree **не может** ускорить `LIKE '%...'` (wildcard слева). Индекс игнорируется.
+`B-tree` индекс не помог, потому что шаблон начинается с `%`. В таком виде индекс не используется.
 
 ### С Hash индексом
 
@@ -393,24 +391,24 @@ Planning Time: 0.123 ms
 Execution Time: 23.366 ms
 ```
 
-> **Parallel Seq Scan** — Hash тоже **не поддерживает** `LIKE`. Индекс игнорируется.
+`Hash` индекс тоже не используется, потому что `LIKE` он не поддерживает.
 
 ---
 
-## Сравнительная таблица
+## Краткое сравнение
 
 | # | Оператор | Без индекса | B-tree | Hash |
 |---|----------|-------------|--------|------|
-| 1 | `=` | Seq Scan, 52.9 ms | Bitmap Index Scan, 41.3 ms | Bitmap Index Scan, **19.9 ms** ✅ |
-| 2 | `>` | Seq Scan, 576.8 ms | Bitmap Index Scan, **8.1 ms** ✅ | Seq Scan, 95.4 ms ❌ |
-| 3 | `<` | Seq Scan, 124.9 ms | Bitmap Index Scan, **68.7 ms** ✅ | Seq Scan, 106.5 ms ❌ |
-| 4 | `LIKE 'prefix%'` + `IN` | Par. Seq Scan, 79.4 ms | Bitmap Index Scan, **47.7 ms** ✅ | Seq Scan, 29.9 ms ❌ |
-| 5 | `LIKE '%suffix'` | Par. Seq Scan, 28.0 ms | Par. Seq Scan, 26.8 ms ❌ | Par. Seq Scan, 23.4 ms ❌ |
+| 1 | `=` | Seq Scan, 52.9 ms | Bitmap Index Scan, 41.3 ms | Bitmap Index Scan, 19.9 ms |
+| 2 | `>` | Seq Scan, 576.8 ms | Bitmap Index Scan, 8.1 ms | Seq Scan, 95.4 ms |
+| 3 | `<` | Seq Scan, 124.9 ms | Bitmap Index Scan, 68.7 ms | Seq Scan, 106.5 ms |
+| 4 | `LIKE 'prefix%'` + `IN` | Par. Seq Scan, 79.4 ms | Bitmap Index Scan, 47.7 ms | Seq Scan, 29.9 ms |
+| 5 | `LIKE '%suffix'` | Par. Seq Scan, 28.0 ms | Par. Seq Scan, 26.8 ms | Par. Seq Scan, 23.4 ms |
 
 ### Выводы
 
-- **B-tree** — универсальный индекс. Поддерживает `=`, `>`, `<`, `>=`, `<=`, `BETWEEN`, `IN`, `LIKE 'prefix%'`. Максимальный выигрыш на запросах с высокой селективностью (запрос 2: ускорение в 71 раз). Не работает с `LIKE '%...'`.
-- **Hash** — специализированный индекс только для `=`. Для точного равенства быстрее B-tree (запрос 1: 19.9 ms vs 41.3 ms). Не поддерживает диапазоны (`>`, `<`), `LIKE`, `IN`.
-- **`LIKE '%...'`** — ни B-tree, ни Hash не помогут. Нужен GIN с `pg_trgm` или полнотекстовый поиск.
+- `B-tree` оказался самым универсальным вариантом. Он подходит для `=`, диапазонов и части строковых условий вроде `LIKE 'prefix%'`.
+- `Hash` имеет смысл в основном для точного сравнения по `=`.
+- Для `LIKE '%...'` ни `B-tree`, ни `Hash` не подходят. Здесь нужен другой тип индекса, например `GIN` с `pg_trgm`.
 
 ---
