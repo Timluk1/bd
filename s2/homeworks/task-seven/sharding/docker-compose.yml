@@ -1,0 +1,76 @@
+services:
+  shard1:
+    image: postgres:15
+    container_name: pg-shard1
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: shard_db
+    command:
+      - postgres
+      - -c
+      - listen_addresses=*
+    ports:
+      - "5433:5432"
+    volumes:
+      - shard1_data:/var/lib/postgresql/data
+      - ./init-shard1:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d shard_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  shard2:
+    image: postgres:15
+    container_name: pg-shard2
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: shard_db
+    command:
+      - postgres
+      - -c
+      - listen_addresses=*
+    ports:
+      - "5434:5432"
+    volumes:
+      - shard2_data:/var/lib/postgresql/data
+      - ./init-shard2:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d shard_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  router:
+    image: postgres:15
+    container_name: pg-router
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: router_db
+    command:
+      - postgres
+      - -c
+      - listen_addresses=*
+    ports:
+      - "5435:5432"
+    volumes:
+      - router_data:/var/lib/postgresql/data
+      - ./init-router:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d router_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      shard1:
+        condition: service_healthy
+      shard2:
+        condition: service_healthy
+
+volumes:
+  shard1_data:
+  shard2_data:
+  router_data:
