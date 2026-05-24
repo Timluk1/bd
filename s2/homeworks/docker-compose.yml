@@ -1,3 +1,6 @@
+version: '3.8'
+name: music_db
+
 networks:
   monitoring:
     name: monitoring
@@ -20,6 +23,25 @@ services:
       interval: 5s
       timeout: 3s
       retries: 3
+    networks:
+      - monitoring
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse-lab
+    ports:
+      - '8123:8123'
+      - '9000:9000'
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: password
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
     networks:
       - monitoring
 
@@ -83,3 +105,4 @@ volumes:
   pgdata:
   prometheus_data:
   grafana_data:
+  clickhouse_data:

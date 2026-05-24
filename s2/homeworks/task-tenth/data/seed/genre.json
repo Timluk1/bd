@@ -1,0 +1,10 @@
+[
+  {"id": 1, "name": "Rock"},
+  {"id": 2, "name": "Pop"},
+  {"id": 3, "name": "Hip-Hop"},
+  {"id": 4, "name": "Jazz"},
+  {"id": 5, "name": "Electronic"},
+  {"id": 6, "name": "Classical"},
+  {"id": 7, "name": "R&B"},
+  {"id": 8, "name": "Metal"}
+]

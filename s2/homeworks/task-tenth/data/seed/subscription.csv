@@ -1,0 +1,5 @@
+id,name,price,duration_months,features
+1,Free,0.0,0,"{""ads"": true, ""offline"": false, ""quality"": ""normal""}"
+2,Premium,9.99,1,"{""ads"": false, ""offline"": true, ""quality"": ""high""}"
+3,Family,14.99,1,"{""ads"": false, ""offline"": true, ""quality"": ""high"", ""accounts"": 6}"
+4,Student,4.99,1,"{""ads"": false, ""offline"": true, ""quality"": ""normal""}"
